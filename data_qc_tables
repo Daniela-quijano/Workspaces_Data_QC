@@ -1,0 +1,41 @@
+library(DBI)
+library(dplyr)
+library(stringr)
+
+# Step 1: Get list of tables from the database connection
+tables <- dbListTables(connection)
+
+# Step 2: List CSV files in both directories
+clinical_csvs <- list.files(
+  path = "~/delivered_data/24Q2/Gilead_Lens_MM_Uterine_DM1DM2_24Q2/DM2.0/Data/Clinical", 
+  pattern = "\\.csv$", full.names = FALSE
+)
+
+group_molecular_csvs <- list.files(
+  path = "~/delivered_data/24Q2/Gilead_Lens_MM_Uterine_DM1DM2_24Q2/DM2.0/Data/Group_Level_Molecular", 
+  pattern = "\\.csv$", full.names = FALSE
+)
+
+# Step 3: Remove the ".csv" extension from the file names
+clinical_csvs <- str_remove(clinical_csvs, "\\.csv$")
+group_molecular_csvs <- str_remove(group_molecular_csvs, "\\.csv$")
+
+# Combine the file names from both directories
+all_csvs <- c(clinical_csvs, group_molecular_csvs)
+
+# Step 4: Compare the table names with the CSV file names
+missing_tables <- setdiff(all_csvs, tables)
+extra_tables <- setdiff(tables, all_csvs)
+
+# Output results
+if (length(missing_tables) == 0) {
+  message("All CSV files match the tables in the database.")
+} else {
+  message("Missing tables: ", paste(missing_tables, collapse = ", "))
+}
+
+if (length(extra_tables) > 0) {
+  message("Extra tables in the database (not matched with CSV files): ", paste(extra_tables, collapse = ", "))
+} else {
+  message("No extra tables found in the database.")
+}
