@@ -1,0 +1,63 @@
+library(tidyverse)
+library(gt)
+library(tempusconnect)
+library(DBI)
+library(dplyr)
+library(readr)
+library(stringr)
+
+# Step 1: Get list of tables from the database connection
+tables <- dbListTables(connection)
+
+# Step 2: List CSV files in both directories
+clinical_csvs <- list.files(
+  path = "~/delivered_data/24Q2/Gilead_Lens_MM_CRC_DM1DM2_24Q2/DM2.0/Data/Clinical", 
+  pattern = "\\.csv$", full.names = TRUE
+)
+
+group_molecular_csvs <- list.files(
+  path = "~/delivered_data/24Q2/Gilead_Lens_MM_CRC_DM1DM2_24Q2/DM2.0/Data/Group_Level_Molecular", 
+  pattern = "\\.csv$", full.names = TRUE
+)
+
+# Step 3: Combine the file paths
+all_csv_files <- c(clinical_csvs, group_molecular_csvs)
+
+# Step 4: Define a vector of table names to ignore
+tables_to_ignore <- c("g_rna_transcript_expression", "onco_result_rna_gene")
+
+# Function to get row count from a CSV file
+get_csv_row_count <- function(file) {
+  nrow(read_csv(file, show_col_types = FALSE))  # read_csv() automatically detects columns and types
+}
+
+# Step 5: Loop through each CSV file, check if the corresponding table exists in the database, and compare row counts
+for (csv_file in all_csv_files) {
+  # Extract the base name of the CSV file without the .csv extension
+  table_name <- str_remove(basename(csv_file), "\\.csv$")
+  
+  # Skip if the table is in the ignore list
+  if (table_name %in% tables_to_ignore) {
+    message("Skipping table: ", table_name)
+    next
+  }
+  
+  # Check if the table exists in the database
+  if (table_name %in% tables) {
+    # Get row count from the database table
+    db_row_count <- tbl(connection, table_name) %>% count() %>% pull(n)
+    
+    # Get row count from the CSV file
+    csv_row_count <- get_csv_row_count(csv_file)
+    
+    # Compare row counts
+    if (db_row_count == csv_row_count) {
+      message("Row count matches for table: ", table_name)
+    } else {
+      message("Row count mismatch for table: ", table_name, 
+              " (DB: ", db_row_count, ", CSV: ", csv_row_count, ")")
+    }
+  } else {
+    message("No corresponding table found in the database for CSV: ", table_name)
+  }
+}
